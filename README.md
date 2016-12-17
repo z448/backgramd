@@ -1,6 +1,6 @@
 #NAME
 
-backgramd - backdoor daemon /linux, osx, ios/
+backgramd - runs in backgramd on linux, osx, ios
 
 **work in progress**
 
